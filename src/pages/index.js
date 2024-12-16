@@ -1,114 +1,111 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import React, { useState } from "react";
+import forge from "node-forge";
 
 export default function Home() {
-  return (
-    <div
-      className={`${geistSans.variable} ${geistMono.variable} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/pages/index.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [message, setMessage] = useState("");
+  const [publicKey, setPublicKey] = useState(process.env.NEXT_PUBLIC_PUBLIC_KEY || "");
+  const [privateKey, setPrivateKey] = useState(process.env.NEXT_PUBLIC_PRIVATE_KEY || "");
+  const [encryption, setEncryption] = useState("");
+  const [decryption, setDecryption] = useState("");
+  const [error, setError] = useState("");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleChange = (setter) => (e) => {
+    setter(e.target.value);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError(""); // Reset error state
+
+    try {
+      // Encrypt the message using hybrid encryption
+      const { encryptedMessage, encryptedKey } = encryptMessage(message, publicKey);
+      setEncryption(encryptedMessage + '::' + encryptedKey); // Store both parts
+
+      // Decrypt the message using the private key
+      const decryptedMessage = decryptMessage(encryptedMessage, encryptedKey, privateKey);
+      setDecryption(decryptedMessage);
+    } catch (err) {
+      setError("An error occurred during encryption/decryption: " + err.message);
+    }
+  };
+
+  const encryptMessage = (message, publicKey) => {
+    // Generate a random symmetric key (AES)
+    const aesKey = forge.random.getBytesSync(16); // AES-128
+    const cipher = forge.cipher.createCipher('AES-CBC', aesKey);
+    
+    // Generate a random IV
+    const iv = forge.random.getBytesSync(16);
+    cipher.start({ iv: iv });
+    cipher.update(forge.util.createBuffer(message));
+    cipher.finish();
+    
+    const encryptedMessage = cipher.output.getBytes();
+    
+    // Encrypt the AES key with RSA
+    const publicKeyObj = forge.pki.publicKeyFromPem(publicKey);
+    const encryptedKey = publicKeyObj.encrypt(aesKey);
+    
+    // Return both encrypted message and encrypted key in Base64
+    return { 
+      encryptedMessage: forge.util.encode64(encryptedMessage + iv), 
+      encryptedKey: forge.util.encode64(encryptedKey) 
+    };
+  };
+
+  const decryptMessage = (encryptedMessage, encryptedKey, privateKey) => {
+    // Decrypt the AES key with RSA
+    const privateKeyObj = forge.pki.privateKeyFromPem(privateKey);
+    const aesKey = privateKeyObj.decrypt(forge.util.decode64(encryptedKey));
+
+    // Extract the IV from the encrypted message
+    const decodedMessage = forge.util.decode64(encryptedMessage);
+    const iv = decodedMessage.slice(-16); // Last 16 bytes are the IV
+    const encryptedContent = decodedMessage.slice(0, -16);
+    
+    // Decrypt the message using AES
+    const decipher = forge.cipher.createDecipher('AES-CBC', aesKey);
+    decipher.start({ iv: iv });
+    decipher.update(forge.util.createBuffer(encryptedContent));
+    decipher.finish();
+    
+    return decipher.output.toString();
+  };
+
+  return (
+    <div>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Message:</label>
+          <input
+            value={message}
+            onChange={handleChange(setMessage)}
+            placeholder="Message here ..."
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        <div>
+          <label>Public Key:</label>
+          <textarea
+            value={publicKey}
+            onChange={handleChange(setPublicKey)}
+            placeholder="Public key here"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+        </div>
+        <div>
+          <label>Private Key:</label>
+          <textarea
+            value={privateKey}
+            onChange={handleChange(setPrivateKey)}
+            placeholder="Private key here"
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+        <button type="submit">Submit</button>
+      </form>
+
+      {error && <strong style={{ color: 'red' }}>{error}</strong>}
+      <strong>Encryption is: {encryption}</strong>
+      <strong>Decryption is: {decryption}</strong>
     </div>
   );
 }
