@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { PDFDocument, rgb } from 'pdf-lib';
 import forge from "node-forge";
 
 export default function Home() {
@@ -19,11 +20,8 @@ export default function Home() {
     setError(""); // Reset error state
 
     try {
-      // Encrypt the message using hybrid encryption
       const { encryptedMessage, encryptedKey } = encryptMessage(message, publicKey);
-      setEncryption(encryptedMessage + '::' + encryptedKey); // Store both parts
-
-      // Decrypt the message using the private key
+      setEncryption(encryptedMessage + '::' + encryptedKey); 
       const decryptedMessage = decryptMessage(encryptedMessage, encryptedKey, privateKey);
       setDecryption(decryptedMessage);
     } catch (err) {
@@ -32,23 +30,17 @@ export default function Home() {
   };
 
   const encryptMessage = (message, publicKey) => {
-    // Generate a random symmetric key (AES)
-    const aesKey = forge.random.getBytesSync(16); // AES-128
+    const aesKey = forge.random.getBytesSync(16);
     const cipher = forge.cipher.createCipher('AES-CBC', aesKey);
-    
-    // Generate a random IV
     const iv = forge.random.getBytesSync(16);
     cipher.start({ iv: iv });
     cipher.update(forge.util.createBuffer(message));
     cipher.finish();
     
     const encryptedMessage = cipher.output.getBytes();
-    
-    // Encrypt the AES key with RSA
     const publicKeyObj = forge.pki.publicKeyFromPem(publicKey);
     const encryptedKey = publicKeyObj.encrypt(aesKey);
     
-    // Return both encrypted message and encrypted key in Base64
     return { 
       encryptedMessage: forge.util.encode64(encryptedMessage + iv), 
       encryptedKey: forge.util.encode64(encryptedKey) 
@@ -56,16 +48,12 @@ export default function Home() {
   };
 
   const decryptMessage = (encryptedMessage, encryptedKey, privateKey) => {
-    // Decrypt the AES key with RSA
     const privateKeyObj = forge.pki.privateKeyFromPem(privateKey);
     const aesKey = privateKeyObj.decrypt(forge.util.decode64(encryptedKey));
-
-    // Extract the IV from the encrypted message
     const decodedMessage = forge.util.decode64(encryptedMessage);
-    const iv = decodedMessage.slice(-16); // Last 16 bytes are the IV
+    const iv = decodedMessage.slice(-16);
     const encryptedContent = decodedMessage.slice(0, -16);
     
-    // Decrypt the message using AES
     const decipher = forge.cipher.createDecipher('AES-CBC', aesKey);
     decipher.start({ iv: iv });
     decipher.update(forge.util.createBuffer(encryptedContent));
@@ -74,38 +62,45 @@ export default function Home() {
     return decipher.output.toString();
   };
 
-  const downloadSignedPdf = (base64Pdf, signerName) => {
-    // Create a Blob from the base64 string
-    const byteCharacters = atob(base64Pdf.split(',')[1]);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: 'application/pdf' });
+  const downloadSignedPdf = async (base64Pdf, signerName) => {
+    const pdfFile = await fetch(base64Pdf).then(res => res.blob());
+    const existingPdfBytes = await pdfFile.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    
+    const page = pdfDoc.getPages()[0];
+    const { width, height } = page.getSize();
 
-    // Create a link element
-    const link = document.createElement('a');
-    const fileName = `downloaded_signed_by_${signerName}.pdf`; // Set the name for the downloaded file
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName;
+    // Draw the signature
+    page.drawText(signerName, {
+      x: 20,
+      y: 20, // Adjust y position as needed
+      size: 15,
+      color: rgb(0, 0, 0),
+    });
 
-    // Trigger the download
-    link.click();
+    // Serialize the PDFDocument to bytes (a Uint8Array)
+    const pdfBytes = await pdfDoc.save();
 
-    // Clean up
-    URL.revokeObjectURL(link.href);
+    // Create a blob and download the signed PDF
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'signed_document.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleSignPdf = () => {
-    // Check if base64 is defined and valid
     if (!base64Client || !base64Client.startsWith("data:application/pdf;base64,")) {
       setError("Please provide a valid base64 PDF string.");
       return;
     }
     
     // Call the download function
-    downloadSignedPdf(base64Client, "Ali");
+    downloadSignedPdf(base64Client, message || "Signature");
   };
 
   return (
@@ -172,7 +167,12 @@ export default function Home() {
         className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-500"
       />
 
-      <button className="p-3 bg-[green]" onClick={handleSignPdf}>Download Pdf</button>
+      <button 
+        onClick={handleSignPdf} 
+        className="mt-4 w-full bg-green-500 text-white font-semibold py-2 rounded-lg hover:bg-green-600 transition"
+      >
+        Sign PDF
+      </button>
     </div>
   );
 }
