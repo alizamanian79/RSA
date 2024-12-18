@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import forge from "node-forge";
 
 export default function Home() {
+  const [base64, setBase64] = useState("");
   const [message, setMessage] = useState("");
   const [publicKey, setPublicKey] = useState(process.env.NEXT_PUBLIC_PUBLIC_KEY || "");
   const [privateKey, setPrivateKey] = useState(process.env.NEXT_PUBLIC_PRIVATE_KEY || "");
@@ -74,38 +75,76 @@ export default function Home() {
   };
 
   return (
-    <div>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Message:</label>
-          <input
-            value={message}
-            onChange={handleChange(setMessage)}
-            placeholder="Message here ..."
-          />
-        </div>
-        <div>
-          <label>Public Key:</label>
-          <textarea
-            value={publicKey}
-            onChange={handleChange(setPublicKey)}
-            placeholder="Public key here"
-          />
-        </div>
-        <div>
-          <label>Private Key:</label>
-          <textarea
-            value={privateKey}
-            onChange={handleChange(setPrivateKey)}
-            placeholder="Private key here"
-          />
-        </div>
-        <button type="submit">Submit</button>
-      </form>
+    <div className="max-w-lg mx-auto p-5 bg-white rounded-lg shadow-md">
+    <form onSubmit={handleSubmit}>
 
-      {error && <strong style={{ color: 'red' }}>{error}</strong>}
-      <strong>Encryption is: {encryption}</strong>
-      <strong>Decryption is: {decryption}</strong>
-    </div>
+
+    <div className="mb-4">
+        <label className="block text-gray-700">Base64:</label>
+        <input
+          type="text"
+          value={base64}
+          onChange={handleChange(setBase64)}
+          placeholder="Message here ..."
+          className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-500"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-gray-700">Your Signature:</label>
+        <input
+          type="text"
+          value={message}
+          onChange={handleChange(setMessage)}
+          placeholder="Your Signature here ..."
+          className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-500"
+        />
+      </div>
+
+
+      <div className="mb-4">
+        <label className="block text-gray-700">Public Key:</label>
+        <textarea
+          value={publicKey}
+          onChange={handleChange(setPublicKey)}
+          placeholder="Public key here"
+          className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-500"
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block text-gray-700">Private Key:</label>
+        <textarea
+          value={privateKey}
+          onChange={handleChange(setPrivateKey)}
+          placeholder="Private key here"
+          className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-500"
+        />
+      </div>
+      <button 
+        type="submit" 
+        className="w-full bg-blue-500 text-white font-semibold py-2 rounded-lg hover:bg-blue-600 transition"
+      >
+        Submit
+      </button>
+    </form>
+
+    {error && <strong className="text-red-500 mt-4 block">{error}</strong>}
+    <strong className="block mt-4">Encryption is:</strong>
+        <textarea
+          value={encryption}
+          className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-500"
+        />
+
+
+    <strong className="block">Decryption is: </strong>
+    <textarea
+          value={decryption}
+          className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-500"
+        />
+
+
+    <button className="p-3 bg-[green]" >Download Pdf </button>
+
+  </div>
   );
 }

@@ -21,7 +21,7 @@ const PdfSigner = () => {
     page.drawText('Ali', {
       x: 20,
       y: 20,
-      size: 50,
+      size: 15,
       color: rgb(0, 0, 0),
     });
 
