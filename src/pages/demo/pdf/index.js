@@ -1,66 +1,50 @@
-import React, { useState } from "react";
-import { PDFDocument } from "pdf-lib";
-import { saveAs } from "file-saver";
+import React, { useState } from 'react';
+import { PDFDocument, rgb } from 'pdf-lib';
 
 const PdfSigner = () => {
-  const [file, setFile] = useState(null);
-  const [signedPdf, setSignedPdf] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
 
-  // مدیریت انتخاب فایل
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    setFile(selectedFile);
+  const handleFileChange = (event) => {
+    setPdfFile(event.target.files[0]);
   };
 
-  // افزودن امضا به PDF
   const handleSignPdf = async () => {
-    if (!file) return;
+    if (!pdfFile) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const arrayBuffer = reader.result;
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
+    const existingPdfBytes = await pdfFile.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    
+    const page = pdfDoc.getPages()[0];
+    const { width, height } = page.getSize();
 
-      // افزودن یک امضا به PDF
-      const pages = pdfDoc.getPages();
-      const firstPage = pages[0];
+    // Draw the signature
+    page.drawText('Ali', {
+      x: 20,
+      y: 20,
+      size: 50,
+      color: rgb(0, 0, 0),
+    });
 
-      // محل قرارگیری امضا (مختصات)
-      firstPage.drawText("امضا شده توسط Milad Hajilou", {
-        x: 50,
-        y: 50,
-        size: 12,
-        color: pdfDoc.constructor.rgb(1, 0, 0),
-      });
+    // Serialize the PDFDocument to bytes (a Uint8Array)
+    const pdfBytes = await pdfDoc.save();
 
-      const signedPdfBytes = await pdfDoc.save();
-
-      // ذخیره فایل PDF امضا‌شده
-      const blob = new Blob([signedPdfBytes], { type: "application/pdf" });
-      saveAs(blob, "signed-document.pdf");
-
-      setSignedPdf(URL.createObjectURL(blob));
-    };
-
-    reader.readAsArrayBuffer(file);
+    // Create a blob and download the signed PDF
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'signed_document.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div>
-      <h2>افزودن امضا به PDF</h2>
+      <h1>PDF Signer</h1>
       <input type="file" accept="application/pdf" onChange={handleFileChange} />
-      <button onClick={handleSignPdf} disabled={!file}>
-        امضا و دانلود PDF
-      </button>
-
-      {signedPdf && (
-        <iframe
-          src={signedPdf}
-          title="Signed PDF"
-          width="100%"
-          height="500px"
-        ></iframe>
-      )}
+      <button onClick={handleSignPdf}>Sign PDF</button>
     </div>
   );
 };
